@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeriez Alart - Notification Sender</title>
+    <style>
+        :root {
+            --primary-color: #1e45F3;
+            --white: #ffffff;
+            --light-gray: #f0f2f5;
+            --gray: #888;
+            --dark-gray: #333;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--light-gray);
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .top-section {
+            background-color: var(--primary-color);
+            padding: 40px 40px 20px;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+        }
+
+        .logo {
+            width: 150px;
+            margin: 0 auto 20px;
+            border-radius: 16px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: var(--dark-gray);
+            margin-bottom: 30px;
+        }
+
+        .top-section h1 {
+            color: var(--white);
+        }
+
+        .form-group {
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background-color: #fafafa;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(30, 69, 243, 0.2);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            margin:  40px 10px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 90%;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: #1a3ac8;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #message {
+            margin-top: 20px;
+            font-weight: 500;
+            height: 20px; /* Reserve space to prevent layout shift */
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="top-section">
+            <img src="logo.png" alt="Aeriez Logo" class="logo">
+            <h1>Notification Sender</h1>
+        </div>
+
+        <div class="form-group">
+            <label for="company-select">Choose a company (Topic):</label>
+            <select name="companies" id="company-select">
+                <option value="acme">Acme</option>
+                <option value="stark">Stark</option>
+                <option value="wayne">Wayne</option>
+                <option value="cyberdyne">Cyberdyne</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="message-input">Message:</label>
+            <textarea id="message-input" placeholder="Enter your notification message..."></textarea>
+        </div>
+
+        <button id="notifyBtn">Send Notification</button>
+        <p id="message"></p>
+    </div>
+
+    <script>
+        const notifyBtn = document.getElementById('notifyBtn');
+        const messageEl = document.getElementById('message');
+        const companySelect = document.getElementById('company-select');
+        const messageInput = document.getElementById('message-input');
+
+        notifyBtn.addEventListener('click', async () => {
+            const topic = companySelect.value;
+            const message = messageInput.value;
+
+            if (!topic) {
+                messageEl.textContent = 'Please select a company.';
+                messageEl.style.color = 'var(--error-color)';
+                return;
+            }
+            if (!message) {
+                messageEl.textContent = 'Please enter a message.';
+                messageEl.style.color = 'var(--error-color)';
+                return;
+            }
+
+            messageEl.textContent = 'Sending...';
+            messageEl.style.color = 'var(--gray)';
+            try {
+                const response = await fetch('/notify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ topic: topic, message: message }) // Send both topic and message
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    messageEl.textContent = `Success: Notification sent!`;
+                    messageEl.style.color = 'var(--success-color)';
+                } else {
+                    messageEl.textContent = `Error: ${result.message}`;
+                    messageEl.style.color = 'var(--error-color)';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                messageEl.textContent = 'Failed to send request.';
+                messageEl.style.color = 'var(--error-color)';
+            }
+            setTimeout(() => { messageEl.textContent = ''; }, 3000);
+        });
+    </script>
+</body>
+</html>
