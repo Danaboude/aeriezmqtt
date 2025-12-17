@@ -72,7 +72,7 @@
             font-weight: 500;
         }
 
-        select, textarea {
+        input[type="text"], select, textarea {
             width: 100%;
             padding: 12px;
             font-size: 1rem;
@@ -83,7 +83,7 @@
             box-sizing: border-box;
         }
 
-        select:focus, textarea:focus {
+        input[type="text"]:focus, select:focus, textarea:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(30, 69, 243, 0.2);
@@ -121,6 +121,12 @@
             font-weight: 500;
             height: 20px; /* Reserve space to prevent layout shift */
         }
+
+        .radio-group label {
+            display: inline-block;
+            margin-right: 20px;
+            color: var(--dark-gray);
+        }
     </style>
 </head>
 <body>
@@ -131,13 +137,26 @@
         </div>
 
         <div class="form-group">
-            <label for="company-select">Choose a company (Topic):</label>
-            <select name="companies" id="company-select">
-                <option value="acme">Acme</option>
-                <option value="stark">Stark</option>
-                <option value="wayne">Wayne</option>
-                <option value="cyberdyne">Cyberdyne</option>
-            </select>
+            <label for="company-id">Company ID:</label>
+            <input type="text" id="company-id" placeholder="e.g., acme">
+        </div>
+
+        <div class="form-group">
+            <label>Target:</label>
+            <div class="radio-group">
+                <label><input type="radio" name="target-type" value="user" checked> User</label>
+                <label><input type="radio" name="target-type" value="group"> Group</label>
+            </div>
+        </div>
+
+        <div class="form-group" id="user-id-group">
+            <label for="user-id">User ID:</label>
+            <input type="text" id="user-id" placeholder="Enter user ID">
+        </div>
+
+        <div class="form-group" id="group-id-group" style="display: none;">
+            <label for="group-id">Group ID:</label>
+            <input type="text" id="group-id" placeholder="Enter group ID">
         </div>
 
         <div class="form-group">
@@ -152,18 +171,57 @@
     <script>
         const notifyBtn = document.getElementById('notifyBtn');
         const messageEl = document.getElementById('message');
-        const companySelect = document.getElementById('company-select');
+        const companyIdInput = document.getElementById('company-id');
+        const userIdInput = document.getElementById('user-id');
+        const groupIdInput = document.getElementById('group-id');
         const messageInput = document.getElementById('message-input');
+        const targetTypeRadios = document.querySelectorAll('input[name="target-type"]');
+        const userIdGroup = document.getElementById('user-id-group');
+        const groupIdGroup = document.getElementById('group-id-group');
+
+        targetTypeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.value === 'user') {
+                    userIdGroup.style.display = 'block';
+                    groupIdGroup.style.display = 'none';
+                } else {
+                    userIdGroup.style.display = 'none';
+                    groupIdGroup.style.display = 'block';
+                }
+            });
+        });
 
         notifyBtn.addEventListener('click', async () => {
-            const topic = companySelect.value;
-            const message = messageInput.value;
+            const companyId = companyIdInput.value.trim();
+            const message = messageInput.value.trim();
+            const targetType = document.querySelector('input[name="target-type"]:checked').value;
+            let topic = '';
+            let targetId = '';
 
-            if (!topic) {
-                messageEl.textContent = 'Please select a company.';
+            if (!companyId) {
+                messageEl.textContent = 'Please enter a Company ID.';
                 messageEl.style.color = 'var(--error-color)';
                 return;
             }
+
+            if (targetType === 'user') {
+                targetId = userIdInput.value.trim();
+                if (!targetId) {
+                    messageEl.textContent = 'Please enter a User ID.';
+                    messageEl.style.color = 'var(--error-color)';
+                    return;
+                }
+                topic = `company/${companyId}/user/${targetId}`;
+            } else { // group
+                targetId = groupIdInput.value.trim();
+                if (!targetId) {
+                    messageEl.textContent = 'Please enter a Group ID.';
+                    messageEl.style.color = 'var(--error-color)';
+                    return;
+                }
+                topic = `company/${companyId}/group/${targetId}`;
+            }
+
             if (!message) {
                 messageEl.textContent = 'Please enter a message.';
                 messageEl.style.color = 'var(--error-color)';
@@ -178,7 +236,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ topic: topic, message: message }) // Send both topic and message
+                    body: JSON.stringify({ topic: topic, message: message })
                 });
                 const result = await response.json();
                 if (response.ok) {

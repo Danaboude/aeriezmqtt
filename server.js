@@ -6,7 +6,7 @@ const app = express();
 const port = 3000;
 
 // --- MQTT Setup ---
-const brokerUrl = 'mqtt://test.mosquitto.org';
+const brokerUrl = 'mqtt://broker.hivemq.com';
 const client = mqtt.connect(brokerUrl);
 
 client.on('connect', () => {
@@ -37,7 +37,7 @@ app.post('/notify', (req, res) => {
     }
 
     const message = {
-        title: `Update from ${topic}`,
+        title: 'New Notification',
         body: customMessage
     };
 
