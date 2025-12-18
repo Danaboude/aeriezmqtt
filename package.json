@@ -14,7 +14,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "amqplib": "^0.10.9",
     "express": "^5.2.1",
-    "mqtt": "^5.14.1"
+    "mqtt": "^5.14.1",
+    "node-fetch": "^2.7.0"
   }
 }
