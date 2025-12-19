@@ -42,6 +42,9 @@ async function pollForNewTickets() {
         // Step 1: Check if the tenant has new tickets
         const checkResponse = await fetchFromApi(`check-tickets?tenant=${TENANT_ID}`);
 
+        // Log heartbeat periodically or on activity
+        // if (Math.random() < 0.1) console.log(`[Daemon] Heartbeat - Polling for ${TENANT_ID}...`);
+
         if (checkResponse && checkResponse.hasNewTickets) {
             console.log(`[Daemon] New tickets found for tenant '${TENANT_ID}'. Fetching recipients...`);
 
@@ -55,13 +58,14 @@ async function pollForNewTickets() {
                     // The topic format is adapted for the mobile client.
                     // Note: RabbitMQ topics use dots as separators, not slashes.
                     const topic = `company.${TENANT_ID}.${recipient.type}.${recipient.id}`;
-                    
+
                     const message = {
                         title: 'New Ticket Alert',
                         body: `A new ticket has been assigned to ${recipient.type} ${recipient.id}.`
                     };
 
                     await publishMessage(topic, message);
+                    // console.log(`[Daemon] Notification dispatched for ${recipient.type}:${recipient.id}`);
                 }
             }
         } else {
@@ -79,10 +83,16 @@ async function pollForNewTickets() {
  */
 function startPolling() {
     console.log(`[Daemon] Starting polling service. Interval: ${POLLING_INTERVAL_MS / 1000} seconds.`);
-    // Initial call
-    pollForNewTickets();
-    // Set up recurring poll
-    setInterval(pollForNewTickets, POLLING_INTERVAL_MS);
+    // Delay start slightly to allow RabbitMQ connection to establish
+    setTimeout(() => {
+        // Initial call
+        pollForNewTickets();
+
+        // Set up recurring poll
+        // Set up recurring poll
+        setInterval(pollForNewTickets, POLLING_INTERVAL_MS);
+        console.log(`[Daemon] Polling started.`);
+    }, 5000);
 }
 
 module.exports = {

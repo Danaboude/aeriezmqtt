@@ -1,74 +1,80 @@
-// This service encapsulates the RabbitMQ connection and publishing logic.
-const amqp = require('amqplib');
+// This service encapsulates the RabbitMQ connection and publishing logic using native MQTT.
+// We switched from AMQP (amqplib) to MQTT (mqtt.js) to ensure 100% compatibility with the mobile client.
+const mqtt = require('mqtt');
 
 // --- CONFIGURATION ---
-// IMPORTANT: Replace with your actual RabbitMQ server details.
-const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost'; 
-const EXCHANGE_NAME = 'aeriez_alart_exchange';
-const EXCHANGE_TYPE = 'topic';
+// IMPORTANT: Connect to the MQTT port (1883), NOT the AMQP port (5672).
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://guest:guest@localhost:1883';
 
-let connection = null;
-let channel = null;
+let client = null;
 
 /**
- * Connects to the RabbitMQ server and creates a channel and exchange.
- * Implements a retry mechanism for robustness.
+ * Connects to the RabbitMQ server via MQTT.
  */
 async function connectToRabbitMQ() {
-    try {
-        console.log('Connecting to RabbitMQ...');
-        connection = await amqp.connect(RABBITMQ_URL);
-        channel = await connection.createChannel();
-        
-        // Assert the exchange exists, creating it if it doesn't.
-        // The 'durable' option ensures the exchange survives broker restarts.
-        await channel.assertExchange(EXCHANGE_NAME, EXCHANGE_TYPE, { durable: true });
+    return new Promise((resolve, reject) => {
+        console.log(`Connecting to MQTT Broker at ${MQTT_BROKER_URL}...`);
 
-        console.log('Successfully connected to RabbitMQ and exchange is ready.');
-
-        // Handle connection closure
-        connection.on('close', () => {
-            console.error('RabbitMQ connection closed. Reconnecting...');
-            setTimeout(connectToRabbitMQ, 5000); // Reconnect after 5 seconds
-        });
-        
-        connection.on('error', (err) => {
-            console.error('RabbitMQ connection error:', err.message);
+        client = mqtt.connect(MQTT_BROKER_URL, {
+            clientId: 'backend_daemon_' + Math.random().toString(16).substr(2, 8),
+            clean: true, // Clean session
+            connectTimeout: 4000,
+            reconnectPeriod: 5000,
         });
 
-    } catch (error) {
-        console.error('Failed to connect to RabbitMQ:', error.message);
-        console.log('Retrying connection in 5 seconds...');
-        setTimeout(connectToRabbitMQ, 5000);
-    }
+        client.on('connect', () => {
+            console.log('Successfully connected to RabbitMQ (MQTT).');
+            resolve(client);
+        });
+
+        client.on('error', (err) => {
+            console.error('MQTT Connection Error:', err.message);
+            // Don't reject immediatly to allow auto-reconnect logic to work, 
+            // but for initial startup we might want to know.
+        });
+
+        client.on('offline', () => {
+            console.warn('MQTT Client is offline.');
+        });
+
+        client.on('reconnect', () => {
+            console.log('MQTT Client reconnecting...');
+        });
+    });
 }
 
 /**
- * Publishes a message to a specific topic on the configured exchange.
+ * Publishes a message to a specific topic.
  * 
- * @param {string} topic The routing key (e.g., 'company.acme.user.user123')
+ * @param {string} topic The topic (e.g., 'company/acme/user/user123') - USE SLASHES!
  * @param {object} message The message payload to be sent.
- * @returns {boolean} True if publish was successful, false otherwise.
+ * @returns {Promise<boolean>} True if publish was successful/queued.
  */
 async function publishMessage(topic, message) {
-    if (!channel) {
-        console.error('Cannot publish message: RabbitMQ channel is not available.');
+    if (!client || !client.connected) {
+        console.error('Cannot publish message: MQTT client is not connected.');
         return false;
     }
 
-    try {
-        const payload = Buffer.from(JSON.stringify(message));
-        
-        // Publish the message to the exchange with the given topic.
-        // The 'persistent' delivery mode ensures messages survive a broker restart.
-        channel.publish(EXCHANGE_NAME, topic, payload, { persistent: true });
-        
-        console.log(`[x] Sent to topic '${topic}': '${JSON.stringify(message)}'`);
-        return true;
-    } catch (error) {
-        console.error('Failed to publish message:', error.message);
-        return false;
-    }
+    // Ensure we use the same format as the mobile app (Slashes)
+    // If the topic comes in as dots, convert it to slashes to be safe.
+    // The previous logic used dots because AMQP->MQTT mapping required it.
+    // Now we are native MQTT, so we just use what the subscriber uses.
+    const mqttTopic = topic.replace(/\./g, '/');
+
+    const payload = JSON.stringify(message);
+
+    return new Promise((resolve) => {
+        client.publish(mqttTopic, payload, { qos: 1, retain: false }, (err) => {
+            if (err) {
+                console.error(`Failed to publish to ${mqttTopic}:`, err.message);
+                resolve(false);
+            } else {
+                console.log(`[x] Sent to MQTT topic '${mqttTopic}': '${payload}'`);
+                resolve(true);
+            }
+        });
+    });
 }
 
 module.exports = {
